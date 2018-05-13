@@ -14,6 +14,7 @@ namespace ReaderTest
             try
             {
                 DataTest.Run();
+                //SetterTest.Run();
             }
             catch(Exception e)
             {

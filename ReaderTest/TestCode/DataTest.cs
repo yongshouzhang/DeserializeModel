@@ -27,7 +27,7 @@ namespace ReaderTest.TestCode
                 SqlCommand cmd = new SqlCommand();
                 cmd.Connection = conn;
 
-                cmd.CommandText = string.Format("Select {0}  from Person.Person", FieldString);
+                cmd.CommandText = string.Format("Select top 10000 {0}  from Person.Person", FieldString);
                 IDataReader reader = cmd.ExecuteReader();
                 Stopwatch st = new Stopwatch();
                 st.Start();
@@ -71,21 +71,24 @@ namespace ReaderTest.TestCode
         public static void Run()
         {
             DataTest test = new DataTest();
-            /*
-            new Func<IDataReader, IEnumerable<Person>>[] { test.ReadData<Person>, test.NewReadData<Person> }
+            new Func<IDataReader, IEnumerable<Person>>[] { test.ILReadData<Person>,test.ReadData<Person>  }
             .ToList().ForEach(fn =>
             {
                 Console.WriteLine("\\\\\\\\\\\\\\\\\\\\\\");
                 Enumerable.Range(0, 10).ToList().ForEach(obj =>
                 {
-                    var result = test.TestMethod(fn);
-                    Console.WriteLine("第{0}次耗时：{1} ms,共{2}条数据", obj, result.RunTime, result.Count);
+                    var time = Enumerable.Range(0, 500).Select(tmp =>
+                      {
+                          return test.TestMethod(fn).RunTime;
+                      }).Average();
+
+                    Console.WriteLine("第{0}次耗时：{1} ms", obj, time);
                 });
                 Console.WriteLine("\\\\\\\\\\\\\\\\\\\\\\ \n\n");
 
             });
-            */
 
+            /*
             new Func<IDataReader, IEnumerable<Person>>[] {
                 test.ReadData<Person>
                // ,
@@ -110,6 +113,7 @@ namespace ReaderTest.TestCode
                      fn.Start(deserializer); //fn.Join();
                  });
             });
+            */
         }
 
         private IEnumerable<T> NewReadData<T>(IDataReader reader)
@@ -119,6 +123,31 @@ namespace ReaderTest.TestCode
                 while (reader.Read())
                 {
                     yield return GetDeserializer<T>.ReflectDeserialize(reader);
+                }
+            }
+            finally
+            {
+                reader.Dispose();
+            }
+        }
+
+        private static object newfn;
+        private IEnumerable<T> ILReadData<T>(IDataReader reader)
+        {
+            if (newfn == null)
+            {
+                Stopwatch st = new Stopwatch();
+                st.Start();
+                newfn = GetDeserializer<T>.Deserialize(reader);
+                st.Stop();
+                Console.WriteLine(" 初始化反序列化函数(使用IL 代码) 。。。，用时：{0}ms", st.Elapsed.TotalMilliseconds);
+            }
+            Func<IDataReader, T> projector = (Func<IDataReader, T>)newfn;
+            try
+            {
+                while (reader.Read())
+                {
+                    yield return projector(reader);
                 }
             }
             finally
